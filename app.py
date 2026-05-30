@@ -50,9 +50,9 @@ with st.sidebar:
 
 st.title("EW M&S Foundation — FMI TEW")
 
-from modules import vision, simulation, landscape
+from modules import vision, simulation, landscape, intelligence
 
-tab1, tab2, tab3 = st.tabs(["🗺️ Vision", "📡 Simulation", "🌐 Landscape"])
+tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Vision", "📡 Simulation", "🌐 Landscape", "🔍 Intelligence"])
 
 with tab1:
     vision.render()
@@ -62,3 +62,6 @@ with tab2:
 
 with tab3:
     landscape.render()
+
+with tab4:
+    intelligence.render()
