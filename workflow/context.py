@@ -1,3 +1,19 @@
+def get_cached_system_blocks() -> list[dict]:
+    """System message blocks with cache_control for the native Anthropic client.
+
+    Marks DANISH_DEFENCE_CONTEXT as ephemeral cached content. Within a 5-minute
+    cache window every subsequent call reads the context from cache rather than
+    re-tokenising it — reducing latency and input-token cost on all agent turns.
+    """
+    return [
+        {
+            "type": "text",
+            "text": DANISH_DEFENCE_CONTEXT,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+
 DANISH_DEFENCE_CONTEXT = """
 ## Danish Armed Forces (Forsvaret) — Structure
 

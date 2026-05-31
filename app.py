@@ -69,12 +69,13 @@ from modules import (
     killchain, threat_evolution, eob,
     vendor, anomaly, arms_race,
     fusion, sensor_perf, trl, teknisk_vurdering,
-    # New modules
     drfm, deep_rl, network_ew, cognitive_radar,
     risk, intel_kb, gap_map, scenarios, elint, emcon,
+    # LLM-power features
+    teknisk_notat, ew_agent,
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
     "🗺️ Vision",
     "📡 Simulation",
     "⚔️ Scenarios",
@@ -84,6 +85,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "🏛️ Function",
     "🎯 Strategy",
     "📂 Library",
+    "📄 Teknisk Notat",
+    "🤖 EW Advisor",
 ])
 
 with tab1:
@@ -167,3 +170,9 @@ with tab8:
 
 with tab9:
     scenarios.render()
+
+with tab10:
+    teknisk_notat.render()
+
+with tab11:
+    ew_agent.render()

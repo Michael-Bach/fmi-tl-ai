@@ -185,3 +185,173 @@ def render():
         note_rows = [{"Area": k[0], "Org": k[1], "Note": v}
                      for k, v in _NOTES.items()]
         st.dataframe(pd.DataFrame(note_rows), use_container_width=True, hide_index=True)
+
+    st.divider()
+    _render_allied_synthesis()
+
+
+# ---------------------------------------------------------------------------
+# LLM-powered allied contribution synthesis
+# ---------------------------------------------------------------------------
+
+_SYNTHESIS_PROMPT = """\
+You are the Team Lead for AI, Modelling and Simulation at FMI TEW.
+
+Below is the EW M&S capability maturity matrix for key Nordic/NATO organisations, \
+scored 0 (None) to 4 (Leading/export-capable). FMI-TEW is the proposed Danish function.
+
+Organisations: {org_names}
+Capability areas: {areas}
+
+Matrix (rows = areas, cols = orgs in same order):
+{matrix_rows}
+
+Using this data, produce a structured contribution strategy in JSON with this exact format:
+{{
+  "unique_contributions": [
+    {{
+      "area": "<capability area name>",
+      "rationale": "<why Denmark has genuine non-duplicative value here (2–3 sentences)>",
+      "priority": "high|medium|low"
+    }}
+  ],
+  "bilateral_priorities": [
+    {{
+      "partner": "<org name>",
+      "recommended_engagement": "<specific, actionable engagement recommendation>",
+      "avoid": "<what not to duplicate from this partner>"
+    }}
+  ],
+  "nmsg_recommendation": {{
+    "lead_wg": "<one NMSG working group Denmark should aspire to lead>",
+    "rationale": "<why Denmark is positioned to lead this>",
+    "contribute_wgs": ["<WG 1>", "<WG 2>"]
+  }},
+  "strategic_summary": "<2–3 sentence plain-language summary for a programme manager>"
+}}
+
+Return ONLY the JSON object. No markdown fences, no other text.
+"""
+
+
+def _build_matrix_text() -> str:
+    lines = []
+    for i, area in enumerate(_AREAS):
+        row_vals = " | ".join(
+            f"{_ORG_NAMES[j]}:{_MATRIX[i][j]}" for j in range(len(_ORG_NAMES))
+        )
+        lines.append(f"  {area}: {row_vals}")
+    return "\n".join(lines)
+
+
+@st.cache_data(show_spinner=False)
+def _call_synthesis_llm() -> dict:
+    """Call Claude with cached context to synthesise Denmark's contribution strategy.
+    Cached by st.cache_data so it only fires once per session."""
+    import json
+    import re
+    from workflow.llm import get_native_client, CACHING_MODEL
+    from workflow.context import get_cached_system_blocks
+
+    client = get_native_client()
+    prompt = _SYNTHESIS_PROMPT.format(
+        org_names=", ".join(_ORG_NAMES),
+        areas=", ".join(_AREAS),
+        matrix_rows=_build_matrix_text(),
+    )
+    response = client.messages.create(
+        model=CACHING_MODEL,
+        max_tokens=2048,
+        system=get_cached_system_blocks(),
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = response.content[0].text.strip()
+    # Parse JSON
+    try:
+        return json.loads(text), response.usage
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group()), response.usage
+            except Exception:
+                pass
+    return {}, response.usage
+
+
+def _render_allied_synthesis():
+    st.subheader("Allied Contribution Strategy — AI Synthesis")
+    st.caption(
+        "LLM-synthesised analysis of where Denmark can make unique, non-duplicative "
+        "contributions to Nordic/NATO EW M&S, based on the capability matrix above. "
+        "Model: claude-sonnet-4-6 with prompt caching."
+    )
+
+    if st.button("Generate contribution strategy", key="gap_synthesis_btn"):
+        with st.spinner("Analysing matrix with Claude…"):
+            result, usage = _call_synthesis_llm()
+
+        if not result:
+            st.error("Could not parse synthesis output.")
+            return
+
+        cache_read = getattr(usage, "cache_read_input_tokens", 0)
+        col_u1, col_u2 = st.columns(2)
+        col_u1.metric("Input tokens", f"{usage.input_tokens:,}")
+        col_u2.metric("Cache read", f"{cache_read:,}",
+                      help="Context served from prompt cache")
+
+        # Strategic summary
+        summary = result.get("strategic_summary", "")
+        if summary:
+            st.info(f"**Strategic summary:** {summary}")
+
+        col_a, col_b = st.columns(2)
+
+        # Unique contributions
+        with col_a:
+            st.markdown("#### Unique Danish Contributions")
+            for uc in result.get("unique_contributions", []):
+                priority = uc.get("priority", "medium")
+                badge_color = {"high": "#e3b341", "medium": "#58a6ff", "low": "#8b949e"}.get(
+                    priority, "#8b949e"
+                )
+                st.markdown(
+                    f"<div style='background:#161b22; padding:10px; margin-bottom:8px; "
+                    f"border-radius:4px; border-left:3px solid {badge_color};'>"
+                    f"<b>{uc.get('area', '—')}</b> "
+                    f"<span style='color:{badge_color}; font-size:11px;'>"
+                    f"[{priority.upper()}]</span><br>"
+                    f"<span style='font-size:13px;'>{uc.get('rationale', '')}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+        # Bilateral priorities
+        with col_b:
+            st.markdown("#### Bilateral Engagement Priorities")
+            for bp in result.get("bilateral_priorities", []):
+                st.markdown(
+                    f"<div style='background:#161b22; padding:10px; margin-bottom:8px; "
+                    f"border-radius:4px; border-left:3px solid #39d353;'>"
+                    f"<b>{bp.get('partner', '—')}</b><br>"
+                    f"<span style='font-size:13px;'>{bp.get('recommended_engagement', '')}</span><br>"
+                    f"<span style='color:#8b949e; font-size:12px;'>"
+                    f"Avoid duplicating: {bp.get('avoid', '')}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+        # NMSG recommendation
+        nmsg = result.get("nmsg_recommendation", {})
+        if nmsg:
+            st.markdown("#### NMSG Working Group Recommendation")
+            lead_wg = nmsg.get("lead_wg", "—")
+            rationale = nmsg.get("rationale", "")
+            contrib = nmsg.get("contribute_wgs", [])
+            st.markdown(
+                f"<div style='background:#0f2a1a; padding:12px; border-radius:4px; "
+                f"border:1px solid #39d353;'>"
+                f"<b>Lead:</b> {lead_wg}<br>"
+                f"<span style='font-size:13px;'>{rationale}</span><br><br>"
+                f"<b>Contribute to:</b> {', '.join(contrib)}</div>",
+                unsafe_allow_html=True,
+            )
