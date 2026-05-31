@@ -12,6 +12,14 @@ load_dotenv()
 
 import math
 import os
+import streamlit as _st_secrets
+
+# Bridge Streamlit Cloud secrets → os.environ
+try:
+    for _k, _v in _st_secrets.secrets.items():
+        os.environ.setdefault(_k, str(_v))
+except Exception:
+    pass
 
 import numpy as np
 import plotly.graph_objects as go

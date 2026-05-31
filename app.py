@@ -1,7 +1,16 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import os
 import streamlit as st
+
+# Streamlit Cloud stores secrets in st.secrets, not os.environ.
+# Bridge them so all workflow/ modules can use os.environ.get() uniformly.
+try:
+    for _k, _v in st.secrets.items():
+        os.environ.setdefault(_k, str(_v))
+except Exception:
+    pass
 
 st.set_page_config(
     page_title="EW M&S Foundation",
